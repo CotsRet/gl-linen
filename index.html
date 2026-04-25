@@ -128,7 +128,7 @@ input::placeholder{color:var(--text3)}
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState, useEffect, useCallback} = React;
+const {useState, useEffect, useEffect, useCallback} = React;
 
 const ITEMS = ['Bath Sheet','Bath Mat','Hand Towel','S King D','S King S',
                'King D','King S','Single D','Single S','Pillow C','Oxford','Tea Towel'];
@@ -194,26 +194,119 @@ const pruneOld = arr => {
   return arr.filter(c => new Date(c.date) >= cut);
 };
 
-// localStorage helpers (works in any browser, data stays on device)
-const load = (key, def) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; } };
-const save = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {} };
+// ── GIST SYNC ─────────────────────────────────────────────────────────────────
+// Reads from public Gist URL, writes via API using token
+// GIST_ID and GIST_TOKEN are defined at the top of the script
+
+const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
+const GIST_RAW = `https://gist.githubusercontent.com/CotsRet/${GIST_ID}/raw/data.json`;
+
+// Local cache fallback
+const localLoad = (key, def) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; } };
+const localSave = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {} };
+
+const fetchGist = async () => {
+  try {
+    const resp = await fetch(GIST_RAW + '?t=' + Date.now());
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch(e) { return null; }
+};
+
+const pushGist = async (data) => {
+  try {
+    await fetch(GIST_API, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${GIST_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        files: { 'data.json': { content: JSON.stringify(data, null, 2) } }
+      })
+    });
+  } catch(e) { console.error('Gist push failed:', e); }
+};
 
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
   const [tab, setTab] = useState('count');
-  const [lodges, setLodges] = useState(() => load('gl:lodges', DEFAULT_LODGES));
-  const [counts, setCounts] = useState(() => pruneOld(load('gl:counts', [])));
-  const [shelf, setShelf] = useState(() => load('gl:shelf', {}));
-  const [glFlow, setGlFlow] = useState(() => load('gl:glflow', []));
-  const [watchList, setWatchList] = useState(() => load('gl:watch', []));
-  const [season, setSeason] = useState(() => load('gl:season', 'high'));
+  const [lodges, setLodges] = useState(DEFAULT_LODGES);
+  const [counts, setCounts] = useState([]);
+  const [shelf, setShelf] = useState({});
+  const [glFlow, setGlFlow] = useState([]);
+  const [watchList, setWatchList] = useState([]);
+  const [season, setSeason] = useState('high');
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(null);
 
-  const saveLodges = v => { setLodges(v); save('gl:lodges', v); };
-  const saveCounts = v => { const p = pruneOld(v); setCounts(p); save('gl:counts', p); };
-  const saveShelf  = v => { setShelf(v); save('gl:shelf', v); };
-  const saveGlFlow = v => { setGlFlow(v); save('gl:glflow', v); };
-  const saveWatch  = v => { setWatchList(v); save('gl:watch', v); };
-  const saveSeason = v => { setSeason(v); save('gl:season', v); };
+  // Load from Gist on startup, fall back to localStorage
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      const gistData = await fetchGist();
+      if (gistData) {
+        setLodges(gistData.lodges || DEFAULT_LODGES);
+        setCounts(pruneOld(gistData.counts || []));
+        setShelf(gistData.shelf || {});
+        setGlFlow(gistData.glFlow || []);
+        setWatchList(gistData.watchList || []);
+        setSeason(gistData.season || 'high');
+        setLastSync(new Date().toLocaleTimeString('en-GB'));
+        // Cache locally too
+        localSave('gl:gist_cache', gistData);
+      } else {
+        // Fall back to local cache
+        const cache = localLoad('gl:gist_cache', null);
+        if (cache) {
+          setLodges(cache.lodges || DEFAULT_LODGES);
+          setCounts(pruneOld(cache.counts || []));
+          setShelf(cache.shelf || {});
+          setGlFlow(cache.glFlow || []);
+          setWatchList(cache.watchList || []);
+          setSeason(cache.season || 'high');
+        }
+      }
+      setLoading(false);
+    };
+    init();
+  }, []);
+
+  // Build current state object for pushing
+  const buildState = (overrides = {}) => {
+    const state = {
+      lodges, counts, shelf, glFlow, watchList, season,
+      _updated: new Date().toISOString(),
+      ...overrides
+    };
+    localSave('gl:gist_cache', state);
+    return state;
+  };
+
+  const syncToGist = async (overrides = {}) => {
+    setSyncing(true);
+    await pushGist(buildState(overrides));
+    setLastSync(new Date().toLocaleTimeString('en-GB'));
+    setSyncing(false);
+  };
+
+  const saveLodges = v => { setLodges(v); syncToGist({lodges: v}); };
+  const saveCounts = v => { const p = pruneOld(v); setCounts(p); syncToGist({counts: p}); };
+  const saveShelf  = v => { setShelf(v); syncToGist({shelf: v}); };
+  const saveGlFlow = v => { setGlFlow(v); syncToGist({glFlow: v}); };
+  const saveWatch  = v => { setWatchList(v); syncToGist({watchList: v}); };
+  const saveSeason = v => { setSeason(v); syncToGist({season: v}); };
+
+  if (loading) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',
+      background:'#f0f7f2',color:'#4a7a5a',flexDirection:'column',gap:12}}>
+      <div style={{fontSize:40}}>🧺</div>
+      <div style={{fontSize:16,fontWeight:600}}>GL Linen</div>
+      <div style={{fontSize:13,color:'#7faa8a'}}>Loading shared data...</div>
+    </div>
+  );
 
   const shortAlerts = counts.filter(c => c.hasShort && c.date === todayStr());
   const tabs = [['count','Count'],['alerts','Alerts'],['stock','Stock'],
@@ -226,7 +319,11 @@ function App() {
           <div className="hdr-logo">GL <span>Linen</span></div>
           <div className="hdr-date">{fmtDateLong(todayStr())}</div>
         </div>
-        <div style={{fontSize:24}}>🧺</div>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+          <div style={{fontSize:24}}>🧺</div>
+          {syncing && <div style={{fontSize:10,color:'rgba(255,255,255,.7)'}}>⟳ Syncing...</div>}
+          {lastSync && !syncing && <div style={{fontSize:10,color:'rgba(255,255,255,.5)'}}>✓ {lastSync}</div>}
+        </div>
       </div>
       <div className="tabs">
         {tabs.map(([id,label]) => (
@@ -568,8 +665,6 @@ function ForecastTab({shelf, lodges, season, saveSeason}) {
   };
 
   const GITHUB_JSON_URL = 'https://raw.githubusercontent.com/CotsRet/gl-linen/main/checkouts.json';
-const GIST_ID = '3bbc8a765d985109e2bfbfc1f5829cec';
-const GIST_TOKEN = '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';
 
   const fetchForecast = async () => {
     setLoading(true); setError('');
