@@ -951,7 +951,16 @@ function CountTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckouts,
 
   const selectLodge = lodge => {
     const ex = countFor(lodge);
-    setCurrent(ex ? {...ex.actual} : {});
+    if (ex) {
+      setCurrent({...ex.actual});
+    } else {
+      // TEMP (from 23 Jul 2026): bag-ins no longer physically counted. Pre-fill each
+      // item to its expected amount so a chip-click assumes a full set came back.
+      const expected = lodges[lodge] || {};
+      const prefill = {};
+      ITEMS.forEach(item => { if ((expected[item]||0) > 0) prefill[item] = expected[item]; });
+      setCurrent(prefill);
+    }
     setSelected(lodge); setDone(false);
     // Always close stock out form when selecting a lodge for counting
     setStockOutLodge(null); setStockOutQty({});
@@ -1028,7 +1037,7 @@ function CountTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckouts,
       if (!ok) return;
     }
     const entry = {id:Date.now(),lodge:selected,date,expected,actual,shorts,overs,
-      hasShort:shorts.length>0,hasOver:overs.length>0,staffName,ts:new Date().toISOString()};
+      hasShort:shorts.length>0,hasOver:overs.length>0,staffName,assumed:true,ts:new Date().toISOString()};
     saveCounts(
       [entry,...counts.filter(c=>!(c.lodge===selected&&c.date===date))],
       {lodge:selected, date, staffName, shorts, overs, totalActual:Object.values(actual).reduce((s,v)=>s+v,0)}
@@ -1046,7 +1055,11 @@ function CountTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckouts,
     <div style={{background:'rgba(72,199,142,.08)',borderRadius:8,padding:'10px 12px',marginBottom:8,
       borderLeft:'4px solid var(--green)'}}>
       <div style={{fontWeight:700,color:'var(--green)',fontSize:13}}>🧺 Bag In — Count Dirty Linen</div>
-      <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Count dirty linen arriving back from lodges. Select a lodge, enter quantities, select your name, then submit.</div>
+      <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Select a lodge — items auto-fill to the expected amount — then pick your name and submit.</div>
+    </div>
+    <div style={{background:'rgba(217,119,6,.10)',borderRadius:8,padding:'10px 12px',marginBottom:8,borderLeft:'4px solid var(--amber)'}}>
+      <div style={{fontWeight:700,color:'var(--amber)',fontSize:13}}>⚡ Auto-fill mode ON (temporary)</div>
+      <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Dirty bags are not being counted for now. Selecting a lodge fills every item to its expected amount — just pick your name and Submit. Only change a figure if you already know it's wrong. These entries are tagged “assumed”.</div>
     </div>
     {done && <div className="card" style={{background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.3)'}}>
       <div style={{color:'var(--green)',fontWeight:700}}>✓ Count submitted</div></div>}
@@ -2231,6 +2244,7 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
         <div className="hist-header">
           <div>
             <div className="hist-lodge" style={{color}}>{icon} {entry.lodge}
+              {entry.assumed && <span style={{marginLeft:8,padding:'2px 8px',fontSize:10,fontWeight:700,letterSpacing:'.5px',background:'rgba(217,119,6,.12)',color:'var(--amber)',border:'1px solid rgba(217,119,6,.35)',borderRadius:10}}>≈ ASSUMED</span>}
               {entry.returnedUnused && <span style={{marginLeft:8,padding:'2px 8px',fontSize:10,fontWeight:700,letterSpacing:'.5px',background:'rgba(127,127,127,.15)',color:'var(--text2)',border:'1px solid rgba(127,127,127,.3)',borderRadius:10}}>↩ RETURNED</span>}
             </div>
             <div className="hist-date">{fmtDate(entry.date)}</div>
