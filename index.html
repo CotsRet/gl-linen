@@ -1039,7 +1039,7 @@ function CountTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckouts,
     const entry = {id:Date.now(),lodge:selected,date,expected,actual,shorts,overs,
       hasShort:shorts.length>0,hasOver:overs.length>0,staffName,assumed:true,ts:new Date().toISOString()};
     saveCounts(
-      [entry,...counts.filter(c=>!(c.lodge===selected&&c.date===date))],
+      [entry,...counts.filter(c=>!(c.lodge===selected&&c.date===date&&c.type!=='stockout'))],
       {lodge:selected, date, staffName, shorts, overs, totalActual:Object.values(actual).reduce((s,v)=>s+v,0)}
     );
     setDone(true); setSelected(null); setCurrent({});
@@ -2147,14 +2147,15 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
   const filtered = counts.filter(c => {
     if (c.type === 'stockout') {
       if (dateFilter && c.date !== dateFilter) return false;
-      return filter === 'all';
+      return filter === 'all' || filter === 'out';
     }
     if (dateFilter && c.date !== dateFilter) return false;
+    if (filter==='out') return false;
     if (filter==='short') return c.hasShort;
     if (filter==='over') return c.hasOver&&!c.hasShort;
     if (filter==='ok') return !c.hasShort&&!c.hasOver;
     return true;
-  });
+  }).sort((a,b)=>String(b.ts||b.date||'').localeCompare(String(a.ts||a.date||'')));
 
   const saveEdit = () => {
     const expected=editEntry.expected, shorts=[], overs=[];
@@ -2190,7 +2191,7 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
     </div>}
     <div style={{display:'flex',gap:6,marginBottom:8,flexWrap:'wrap',justifyContent:'space-between',alignItems:'center'}}>
       <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-        {[['all','All'],['short','⚠ Short'],['over','↑ Over'],['ok','✓ OK']].map(([v,l]) =>
+        {[['all','All'],['out','📤 Out'],['short','⚠ Short'],['over','↑ Over'],['ok','✓ OK']].map(([v,l]) =>
           <button key={v} className={`btn btn-sm ${filter===v?'btn-primary':'btn-ghost'}`} onClick={()=>setFilter(v)}>{l}</button>
         )}
       </div>
@@ -2289,13 +2290,14 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
                   {diff!==null&&diff>0&&<span className="c-amber mono"> ▲{diff}</span>}
                   {isShort&&<button className="btn btn-ghost btn-sm" style={{fontSize:9,padding:'1px 6px',color:'var(--accent)',borderColor:'var(--accent)'}}
                     onClick={()=>{
+                      if(!window.confirm(`Put ${missing} × ${item} back on the warehouse shelf and mark ${entry.lodge} as no longer short on it?\n\nThis adjusts stock and can't be undone.`)) return;
                       saveShelf({...shelf, [item]:(shelf[item]||0)+missing}, 'short_returned_to_stock', {lodge: entry.lodge, item, missing, source: 'history_tab'});
                       saveCounts(counts.map(c=>{
                         if(c.id!==entry.id) return c;
                         const actual={...c.actual,[item]:(c.actual[item]||0)+missing};
                         const shorts=(c.shorts||[]).filter(s=>s!==item);
                         return {...c,actual,shorts,hasShort:shorts.length>0};
-                      }));
+                      }), {action:'short_corrected', lodge:entry.lodge, item, missing, source:'history_tab'});
                     }}>📦+{missing}</button>}
                 </span>;
               })
@@ -2894,7 +2896,9 @@ function SettingsTab({lodges, saveLodges}) {
 
   const addLodge = () => {
     if (!name.trim()) return;
-    saveLodges({...lodges,[name.trim().toUpperCase()]:{...quantities}});
+    const code = name.trim().toUpperCase();
+    if (lodges[code] && !window.confirm(`Lodge ${code} already exists.\n\nOverwrite its saved par set with the quantities on screen? Any item left at 0 will overwrite the old amount.`)) return;
+    saveLodges({...lodges,[code]:{...quantities}});
     setName(''); setQuantities({}); setSaved(true);
     setTimeout(()=>setSaved(false),2000);
   };
