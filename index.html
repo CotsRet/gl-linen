@@ -1488,7 +1488,7 @@ function StockTab({shelf, saveShelf}) {
       </div>
     </div>}
 
-    {shelf._updated && <div style={{fontSize:12,color:'var(--text3)',marginBottom:12,fontFamily:'DM Mono,monospace'}}>Last updated: {fmtDate(shelf._updated)}</div>}
+    {shelf._updated && <div style={{fontSize:12,color:'var(--text3)',marginBottom:12,fontFamily:'DM Mono,monospace'}}>Last updated: {(()=>{const s=shelf._updated;const d=new Date(s);return(!isNaN(d.getTime())&&String(s).includes('T'))?d.toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):fmtDate(s);})()}</div>}
 
     {checking ? <>
       <div style={{background:'rgba(45,158,95,0.1)',borderLeft:'4px solid var(--accent)',padding:'8px 12px',borderRadius:6,marginBottom:12,fontSize:13}}>
