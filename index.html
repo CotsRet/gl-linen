@@ -1645,7 +1645,11 @@ function GlFlowTab({glFlow, saveGlFlow, counts, watchList, saveWatch, shelf, sav
     }
     let missing=[];
     if (formType==='delivery') {
-      const lastCol=[...glFlow].find(g=>g.type==='collection');
+      // Match this delivery to the most recent collection from a PREVIOUS cycle (dated
+      // before this delivery). GL runs a ~2-day turnaround, so a delivery returns an
+      // earlier collection, never one logged the same day — this stops a fresh same-day
+      // collection being falsely flagged as owed on the watch list.
+      const lastCol=[...glFlow].find(g=>g.type==='collection' && (g.date||'') < formDate);
       if (lastCol) ITEMS.forEach(item => {
         const sent=lastCol.data[item]||0, recv=formData[item]||0;
         if (recv<sent) missing.push({item,sent,received:recv,short:sent-recv});
