@@ -1322,10 +1322,18 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
       return (c.date || '') >= fiveDaysAgoStr;                          // legacy fallback
     }).map(c => c.lodge)
   );
+  // For the "please send a stock out" prompt, ANY returned-unused delivery today
+  // — including a "dirty still due" one — means no fresh linen is going out, so
+  // don't nag staff to re-send it. (The dirty bag-in is still tracked via the
+  // Uncounted Dirty Linen list / Bag-In "count?" badge, which honour dirtyStillDue.)
+  const deliveryReturnedToday = new Set(
+    counts.filter(c => c.type==='stockout' && c.returnedUnused && c.date>=fiveDaysAgoStr)
+          .map(c => c.lodge)
+  );
   const unconfirmed = (todayCheckouts||[]).filter(l => {
     if (!(lodges && lodges[l])) return false; // not a linen lodge — we clean it but don't do its laundry
     if (confirmedOut.has(l)) return false;
-    if (noServiceToday.has(l)) return false;
+    if (deliveryReturnedToday.has(l)) return false;
     if (dismissedCheckouts && dismissedCheckouts[`${l}|${today}`]) return false; // phantom checkout
     return true;
   });
