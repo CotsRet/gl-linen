@@ -698,7 +698,10 @@ function App() {
           <div className="hdr-date">{fmtDateLong(todayStr())}</div>
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
-          <div style={{fontSize:24}}>🧺</div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <a href="guide.html" title="How to use this app" style={{textDecoration:'none',width:23,height:23,borderRadius:'50%',border:'1.5px solid rgba(255,255,255,.65)',color:'#fff',fontSize:14,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,flex:'none'}}>?</a>
+            <div style={{fontSize:24}}>🧺</div>
+          </div>
           {syncing && <div style={{fontSize:10,color:'rgba(255,255,255,.7)'}}>⟳ Syncing...</div>}
           {syncError && !syncing && <div style={{fontSize:10,color:'#ff6b6b',fontWeight:700}}>⚠ Sync failed — try again</div>}
           {lastSync && !syncing && <div style={{fontSize:10,color:'rgba(255,255,255,.5)'}}>✓ {lastSync}</div>}
