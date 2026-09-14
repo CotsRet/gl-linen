@@ -380,11 +380,13 @@ function App() {
         setSeason(cached.season || 'high');
       }
       // Fetch today's checkouts from checkouts.json
+      let todaysCheckoutList = [];
       try {
         const coResp = await fetch(GITHUB_JSON_URL + '?t=' + Date.now());
         if (coResp.ok) {
           const coData = await coResp.json();
           const td = todayStr();
+          todaysCheckoutList = coData[td] || [];
           setTodayCheckouts(coData[td] || []);
           setAllCheckouts(coData);
         }
@@ -407,6 +409,64 @@ function App() {
         setDismissedCheckouts(data.dismissedCheckouts || {});
         localSave('gl:cache', data);
         setLastSync(new Date().toLocaleTimeString('en-GB'));
+
+        // ── AUTO-LOG today's delivery bags (added 14 Sep 2026) ────────────────
+        // The moment the first device loads with fresh shared data, create a
+        // delivery-out (stock-out) for every checkout due TODAY that has no
+        // stock-out logged yet — full standard set, deducts the shelf, no staff
+        // action and no button. This removes the step staff kept forgetting.
+        // Idempotent: skips any lodge already logged (by staff, the alert, or an
+        // earlier auto-run), and re-reads the latest shared state right before
+        // writing, so opening the app on several phones never doubles a bag.
+        // Shorts are handled off-app on the manual list, per ops.
+        try {
+          const td = todayStr();
+          const lodgeSets = data.lodges || {};
+          if (todaysCheckoutList && todaysCheckoutList.length) {
+            const freshCounts = await supaGet('counts');
+            const baseCounts  = pruneOld(Array.isArray(freshCounts) ? freshCounts : (data.counts || []));
+            const freshShelf  = await supaGet('shelf');
+            const shelfNow    = (freshShelf && typeof freshShelf === 'object') ? freshShelf : (data.shelf || {});
+            const alreadyOut  = new Set(
+              baseCounts
+                .filter(c => c && c.type === 'stockout' && c.forCheckoutDate === td && !c.returnedUnused)
+                .map(c => c.lodge)
+            );
+            const toLog = todaysCheckoutList.filter(l => lodgeSets[l] && !alreadyOut.has(l));
+            if (toLog.length) {
+              const newEntries = [];
+              const newShelf   = {...shelfNow};
+              const idBase     = Date.now();
+              toLog.forEach((l, i) => {
+                const set = lodgeSets[l] || {};
+                const actual = {};
+                ITEMS.forEach(it => { if ((set[it] || 0) > 0) actual[it] = set[it]; });
+                const totalOut = Object.values(actual).reduce((s, v) => s + v, 0);
+                newEntries.push({
+                  id: idBase + i, type: 'stockout', lodge: l,
+                  date: td, forCheckoutDate: td, actual,
+                  staffName: 'auto', auto: true, ts: new Date().toISOString()
+                });
+                ITEMS.forEach(it => { if (actual[it]) newShelf[it] = (newShelf[it] || 0) - actual[it]; });
+                supaAudit('stockout_saved', {
+                  lodge: l, date: td, forCheckoutDate: td, staffName: 'auto',
+                  totalOut, qty: {...actual},
+                  delta: Object.fromEntries(Object.entries(actual).map(([k, v]) => [k, -v])),
+                  note: 'auto-logged on app load'
+                });
+              });
+              const mergedCounts = pruneOld([...newEntries, ...baseCounts]);
+              const okC = await syncKey('counts', mergedCounts);
+              if (okC) setCounts(mergedCounts);
+              newShelf._updated = new Date().toISOString();
+              const okS = await syncKey('shelf', newShelf);
+              if (okS) setShelf(newShelf);
+              updateCache({counts: mergedCounts, shelf: newShelf});
+              setLastSync(new Date().toLocaleTimeString('en-GB'));
+              console.log('[auto-log] ' + toLog.length + ' delivery bag(s) for ' + td + ': ' + toLog.join(', '));
+            }
+          }
+        } catch(e) { console.error('auto-log failed:', e); }
       }
     };
     init();
@@ -1327,6 +1387,30 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
       {lodge, date: todayStr(), forCheckoutDate: todayStr(), staffName: 'alert confirm', totalOut, qty: {...qty}});
   };
 
+  // Cancel a delivery that wasn't needed (e.g. a no-show or a phantom booking):
+  // the linen goes straight back on the shelf and the delivery is marked
+  // returned-unused, which also suppresses the bag-in expectation for that lodge.
+  // Same behaviour as History's "Return Unused" — surfaced here so staff can do
+  // it where they work, including cancelling an AUTO-logged bag.
+  const returnUnused = (entry) => {
+    if (!window.confirm(`Send ${entry.lodge}'s delivery back to stock as unused?\n\nThe linen goes back on the warehouse shelf and no bag-in will be expected for this lodge today.`)) return;
+    const newShelf = {...shelf};
+    ITEMS.forEach(item => {
+      const qty = (entry.actual || entry.qty || {})[item] || 0;
+      if (qty > 0) newShelf[item] = (newShelf[item] || 0) + qty;
+    });
+    saveShelf(newShelf, 'delivery_returned_unused', {
+      lodge: entry.lodge, date: entry.date,
+      qtyReturned: {...(entry.actual || entry.qty || {})},
+      originalStockoutId: entry.id, staffName: ''
+    });
+    saveCounts(counts.map(c => c.id === entry.id ? {...c, returnedUnused: true, returnedAt: new Date().toISOString()} : c));
+  };
+  // Every delivery-out logged for today (auto or manual), newest first.
+  const todaysDeliveries = counts
+    .filter(c => c.type === 'stockout' && (c.date === todayStr() || c.forCheckoutDate === todayStr()))
+    .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+
   return <>
     {reconciliationAlert && <div className="card" style={{background:'rgba(211,139,0,.08)',border:'1px solid rgba(211,139,0,.3)',marginBottom:8}}>
       <div style={{fontWeight:700,color:'var(--amber)',marginBottom:4}}>📅 Weekly Stock Check</div>
@@ -1351,6 +1435,23 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
           background: isPast4pm ? 'rgba(229,62,62,.15)' : 'rgba(245,158,11,.15)',
           color: isPast4pm ? 'var(--red)' : 'var(--amber)'
         }}>{l} ✓</button>)}
+      </div>
+    </div>}
+
+    {todaysDeliveries.length > 0 && <div className="card" style={{marginBottom:12}}>
+      <div style={{fontWeight:700,marginBottom:6,fontSize:14,color:'var(--accent)'}}>📤 Today's Delivery Bags ({todaysDeliveries.filter(c=>!c.returnedUnused).length})</div>
+      <div style={{fontSize:12,color:'var(--text2)',marginBottom:8}}>Logged out for today's checkouts. If a bag wasn't needed — a no-show or a cancelled booking — tap "Not needed" and the linen goes straight back on the shelf.</div>
+      <div style={{display:'flex',flexDirection:'column',gap:0}}>
+        {todaysDeliveries.map(entry => (
+          <div key={entry.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid var(--border)',opacity:entry.returnedUnused?.5:1}}>
+            <span style={{fontWeight:700,fontSize:14,display:'flex',alignItems:'center',flexWrap:'wrap',gap:4}}>
+              {entry.lodge}
+              {entry.auto && <span style={{padding:'2px 9px',fontSize:11,fontWeight:800,letterSpacing:'.8px',background:'#2563eb',color:'#fff',borderRadius:8,boxShadow:'0 1px 2px rgba(0,0,0,.25)'}}>⚡ AUTO</span>}
+              {entry.returnedUnused && <span style={{padding:'2px 8px',fontSize:10,fontWeight:700,letterSpacing:'.5px',background:'rgba(127,127,127,.15)',color:'var(--text2)',border:'1px solid rgba(127,127,127,.3)',borderRadius:10}}>↩ RETURNED</span>}
+            </span>
+            {!entry.returnedUnused && <button onClick={()=>returnUnused(entry)} style={{padding:'5px 12px',borderRadius:20,fontSize:12,fontWeight:700,cursor:'pointer',border:'1px solid var(--border)',background:'var(--surf2)',color:'var(--text2)',whiteSpace:'nowrap'}}>↩ Not needed</button>}
+          </div>
+        ))}
       </div>
     </div>}
 
@@ -2274,6 +2375,7 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
           <div>
             <div className="hist-lodge" style={{color}}>{icon} {entry.lodge}
               {entry.assumed && <span style={{marginLeft:8,padding:'2px 8px',fontSize:10,fontWeight:700,letterSpacing:'.5px',background:'rgba(217,119,6,.12)',color:'var(--amber)',border:'1px solid rgba(217,119,6,.35)',borderRadius:10}}>≈ ASSUMED</span>}
+              {entry.auto && <span style={{marginLeft:8,padding:'2px 9px',fontSize:11,fontWeight:800,letterSpacing:'.8px',background:'#2563eb',color:'#fff',borderRadius:8,boxShadow:'0 1px 2px rgba(0,0,0,.25)'}}>⚡ AUTO</span>}
               {entry.returnedUnused && <span style={{marginLeft:8,padding:'2px 8px',fontSize:10,fontWeight:700,letterSpacing:'.5px',background:'rgba(127,127,127,.15)',color:'var(--text2)',border:'1px solid rgba(127,127,127,.3)',borderRadius:10}}>↩ RETURNED</span>}
             </div>
             <div className="hist-date">{fmtDate(entry.date)}</div>
