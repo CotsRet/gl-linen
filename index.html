@@ -1320,7 +1320,14 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
   });
   const isPast4pm = new Date().getHours() >= 16;
 
-  if (!alerts.length && !unconfirmed.length && !reconciliationAlert) return <div className="empty"><div className="empty-icon">✅</div>No alerts today</div>;
+  // Every delivery-out logged for today (auto or manual), newest first — so the
+  // "Today's Delivery Bags" card (with the AUTO badge + one-tap return-unused)
+  // shows even when there are no other alerts.
+  const todaysDeliveries = counts
+    .filter(c => c.type === 'stockout' && (c.date === todayStr() || c.forCheckoutDate === todayStr()))
+    .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+
+  if (!alerts.length && !unconfirmed.length && !reconciliationAlert && !todaysDeliveries.length) return <div className="empty"><div className="empty-icon">✅</div>No alerts today</div>;
 
   const markRetrieved = (id, item) => {
     saveCounts(counts.map(c => {
@@ -1406,10 +1413,6 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
     });
     saveCounts(counts.map(c => c.id === entry.id ? {...c, returnedUnused: true, returnedAt: new Date().toISOString()} : c));
   };
-  // Every delivery-out logged for today (auto or manual), newest first.
-  const todaysDeliveries = counts
-    .filter(c => c.type === 'stockout' && (c.date === todayStr() || c.forCheckoutDate === todayStr()))
-    .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
 
   return <>
     {reconciliationAlert && <div className="card" style={{background:'rgba(211,139,0,.08)',border:'1px solid rgba(211,139,0,.3)',marginBottom:8}}>
