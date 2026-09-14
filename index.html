@@ -785,6 +785,14 @@ function StockOutTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckou
 
   const selectLodge = l => {
     if (l === selected) return;  // re-tapping the lodge that's already open won't wipe your counts
+    // Already logged out for today (auto or manual)? Don't open the form — that
+    // would let a staff member save a duplicate bag. Tell them it's done and
+    // point to the one place to undo it if it wasn't needed.
+    const doneToday = counts.find(c => c.lodge===l && c.type==='stockout' && !c.returnedUnused && (c.date===todayStr() || c.forCheckoutDate===todayStr()));
+    if (doneToday) {
+      window.alert(`✅ ${l}'s delivery is already logged for today${doneToday.auto ? ' — logged automatically (⚡ AUTO)' : ''}.\n\nYou don't need to log it again.\n\nIf the bag wasn't needed (a no-show or a cancelled booking), go to the Alerts tab and tap "Not needed" on ${l} to send the linen back to the shelf.`);
+      return;
+    }
     setSelected(l);
     setDone(false);
     // Pre-fill with lodge's full set
@@ -892,6 +900,7 @@ function StockOutTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckou
     <div className="lodge-grid">
       {lodgeList.map(l => {
         const delCount = recentDeliveryCount(l);
+        const autoToday = counts.some(c => c.lodge===l && c.type==='stockout' && !c.returnedUnused && c.auto && (c.date===todayStr() || c.forCheckoutDate===todayStr()));
         const isCheckoutToday = todayCheckouts.includes(l);
         const isDismissedToday = dismissedCheckouts && dismissedCheckouts[`${l}|${todayStr()}`];
         const isActive = delCount > 0 || (isCheckoutToday && !isDismissedToday);
@@ -900,8 +909,8 @@ function StockOutTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckou
         return (
           <div key={l} className={chipCls(l)} onClick={()=>selectLodge(l)}>
             {l}
-            {delCount > 0 && <span style={{fontSize:8,display:'block',color:'#0288d1'}}>
-              📦 bagged{delCount > 1 ? ' ×' + delCount : ''}
+            {delCount > 0 && <span style={{fontSize:8,display:'block',fontWeight:autoToday?800:400,letterSpacing:autoToday?'.4px':0,color:autoToday?'#2563eb':'#0288d1'}}>
+              {autoToday ? '⚡ AUTO ✓' : '📦 bagged' + (delCount > 1 ? ' ×' + delCount : '')}
             </span>}
             {delCount === 0 && isCheckoutToday && !isDismissedToday && <span style={{fontSize:8,display:'block',color:'var(--amber)'}}>
               checkout
