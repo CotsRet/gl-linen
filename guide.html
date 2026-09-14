@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GL Linen Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#f3f6f3; --surface:#ffffff; --surface2:#eef2ee; --border:#d8e2db;
+    --text:#152019; --text2:#586a60; --muted:#7c8d83;
+    --green:#1f7a4d; --green-deep:#0f5233; --green-soft:#e5f2ea;
+    --blue:#2563eb; --blue-soft:#e5edff;
+    --amber:#b45309; --amber-soft:#fdf1dd;
+    --red:#c62828; --red-soft:#fdecec;
+    --shadow:0 1px 2px rgba(20,40,30,.06),0 4px 16px rgba(20,40,30,.05);
+    --radius:14px;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --display:"Bricolage Grotesque",var(--sans);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1512; --surface:#17201b; --surface2:#1d2822; --border:#2b3830;
+      --text:#e9efea; --text2:#a2b3a8; --muted:#7f9188;
+      --green:#4ade80; --green-deep:#86efac; --green-soft:#16271d;
+      --blue:#7ca5ff; --blue-soft:#152238;
+      --amber:#f0b45f; --amber-soft:#2a2113;
+      --red:#f28b82; --red-soft:#2c1717;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1512; --surface:#17201b; --surface2:#1d2822; --border:#2b3830;
+    --text:#e9efea; --text2:#a2b3a8; --muted:#7f9188;
+    --green:#4ade80; --green-deep:#86efac; --green-soft:#16271d;
+    --blue:#7ca5ff; --blue-soft:#152238;
+    --amber:#f0b45f; --amber-soft:#2a2113;
+    --red:#f28b82; --red-soft:#2c1717;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.28);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+  .wrap{max-width:760px;margin:0 auto;padding-inline:16px}
+
+  /* ---- sticky header + toggle ---- */
+  header.top{position:sticky;top:0;z-index:20;background:var(--green-deep);
+    color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+  :root[data-theme="dark"] header.top, :root:not([data-theme="light"]) header.top{background:#123b28}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) header.top{background:#123b28}}
+  .top .wrap{padding-block:12px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .logo{font-size:26px;line-height:1}
+  .brand h1{font-family:var(--display);font-size:20px;font-weight:800;margin:0;letter-spacing:-.01em;color:#fff}
+  .brand .sub{font-size:12.5px;color:rgba(255,255,255,.75);margin-top:1px}
+  .toggle{display:flex;gap:8px;margin-top:12px}
+  .toggle button{flex:1;min-height:46px;border:1px solid rgba(255,255,255,.28);
+    background:rgba(255,255,255,.08);color:#fff;border-radius:11px;
+    font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2;
+    transition:background .12s,border-color .12s}
+  .toggle button small{font-weight:400;font-size:11.5px;color:rgba(255,255,255,.7)}
+  .toggle button[aria-selected="true"]{background:#fff;color:var(--green-deep);border-color:#fff}
+  .toggle button[aria-selected="true"] small{color:var(--green)}
+
+  main{padding-block:22px 60px}
+  section[hidden]{display:none!important}
+  .lead{font-size:16.5px;color:var(--text2);margin:2px 0 22px}
+  .lead strong{color:var(--text)}
+
+  h2{font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--green);margin:34px 0 12px}
+  h2:first-of-type{margin-top:6px}
+
+  /* ---- step cards ---- */
+  .step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px;position:relative;overflow:hidden}
+  .step::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--green)}
+  .step .stepno{display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;
+    font-family:var(--display);font-weight:700;font-size:14px;flex:none}
+  .step .hd{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+  .step .hd h3{font-family:var(--display);font-weight:700;font-size:17.5px;margin:0;line-height:1.25}
+  .step .hd .where{font-size:12px;color:var(--muted);font-weight:500;margin-top:1px}
+  .step ol,.step ul{margin:8px 0 0;padding-left:20px}
+  .step li{margin:6px 0}
+  .step p{margin:8px 0 0}
+
+  .path{font-family:var(--display);font-weight:600;font-size:13px;background:var(--surface2);
+    border:1px solid var(--border);border-radius:7px;padding:2px 8px;display:inline-block;color:var(--text2);white-space:nowrap}
+
+  /* ---- badges mirroring the app ---- */
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;
+    padding:2px 8px;border-radius:20px;letter-spacing:.02em;white-space:nowrap;vertical-align:middle}
+  .b-auto{background:var(--blue);color:#fff}
+  .b-bagged{background:var(--blue-soft);color:var(--blue)}
+  .b-count{background:var(--amber-soft);color:var(--amber)}
+  .b-short{background:var(--red-soft);color:var(--red)}
+  .b-ok{background:var(--green-soft);color:var(--green)}
+
+  /* ---- callouts ---- */
+  .note{border-radius:12px;padding:13px 15px;margin:14px 0;font-size:14.5px;border:1px solid}
+  .note .lbl{font-family:var(--display);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+  .note.rule{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+  .note.rule .lbl{color:var(--green)}
+  .note.warn{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 35%,transparent)}
+  .note.warn .lbl{color:var(--amber)}
+  .note.stop{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 35%,transparent)}
+  .note.stop .lbl{color:var(--red)}
+  .note ul{margin:6px 0 0;padding-left:19px}
+  .note li{margin:5px 0}
+
+  /* ---- key / legend ---- */
+  .legend{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px}
+  .legend .row{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--border)}
+  .legend .row:first-of-type{border-top:0}
+  .legend .row .txt{font-size:14px;color:var(--text2)}
+  .legend .row .txt b{color:var(--text)}
+
+  /* ---- office reference blocks ---- */
+  .ref{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:14px 18px;margin-bottom:13px}
+  .ref h3{font-family:var(--display);font-weight:700;font-size:16px;margin:0 0 3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ref .tabs{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .ref p{margin:7px 0;font-size:14.5px;color:var(--text2)}
+  .ref p strong{color:var(--text)}
+  .ref ul{margin:7px 0;padding-left:19px;font-size:14.5px;color:var(--text2)}
+  .ref li{margin:5px 0}
+  .ref li strong{color:var(--text)}
+
+  /* ---- exceptions table ---- */
+  .tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);background:var(--surface)}
+  table{border-collapse:collapse;width:100%;min-width:460px;font-size:14px}
+  th,td{text-align:left;padding:11px 14px;vertical-align:top;border-top:1px solid var(--border)}
+  thead th{background:var(--surface2);font-family:var(--display);font-weight:700;font-size:12px;
+    text-transform:uppercase;letter-spacing:.04em;color:var(--text2);border-top:0}
+  td:first-child{font-weight:600;color:var(--text);width:44%}
+  td:last-child{color:var(--text2)}
+
+  footer{margin-top:30px;padding-top:16px;border-top:1px solid var(--border);
+    font-size:12.5px;color:var(--muted);text-align:center}
+  a{color:var(--green);font-weight:600}
+
+  @media (max-width:420px){
+    body{font-size:15.5px}
+    .brand h1{font-size:18px}
+    .step .hd h3{font-size:16.5px}
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand">
+        <span class="logo">🧺</span>
+        <div>
+          <h1>GL Linen Guide</h1>
+          <div class="sub">Cotswold Retreats · how to use the linen app</div>
+        </div>
+      </div>
+      <div class="toggle" role="tablist" aria-label="Choose guide">
+        <button id="tab-staff" role="tab" aria-selected="true" aria-controls="staff" onclick="showPane('staff')">
+          👋 Daily use<small>for cleaning staff</small></button>
+        <button id="tab-office" role="tab" aria-selected="false" aria-controls="office" onclick="showPane('office')">
+          🗂 Full reference<small>for the office</small></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- ============ STAFF ============ -->
+    <section id="staff" role="tabpanel" aria-labelledby="tab-staff">
+      <p class="lead">Most days you only touch <strong>two things</strong>: <strong>Bag In</strong> (count the dirty linen you're sending back) and <strong>Alerts</strong> (anything unusual). Clean linen going out is now mostly <strong>automatic</strong> — you don't log it.</p>
+
+      <h2>Your daily jobs</h2>
+
+      <div class="step">
+        <div class="hd">
+          <span class="stepno">1</span>
+          <div>
+            <h3>Count the dirty linen</h3>
+            <div class="where">once you've stripped &amp; cleaned a lodge</div>
+          </div>
+        </div>
+        <p>Go to <span class="path">DAILY OPS › BAG IN</span></p>
+        <ol>
+          <li>Tap the lodge you've just done. Lodges still waiting to be counted show a small amber <span class="badge b-count">⚠ count?</span></li>
+          <li>For every item, put in <b>how many dirty pieces</b> are going back to GL — type the number or use the − / + buttons.</li>
+          <li>Choose your name under <b>“Counted by”</b>.</li>
+          <li>Tap <b>✓ Submit Count</b>.</li>
+          <li>Repeat for every lodge showing <span class="badge b-count">⚠ count?</span></li>
+        </ol>
+        <div class="note warn"><span class="lbl">If a red “no delivery recorded” warning pops up</span>
+          It just means no clean bag went out for that lodge recently. If you know that's correct, carry on. If clean linen <em>did</em> go out, close it and tell the office — don't force it.</div>
+      </div>
+
+      <div class="step">
+        <div class="hd">
+          <span class="stepno">2</span>
+          <div>
+            <h3>Clean linen going out — leave it alone</h3>
+            <div class="where">the app does this for you now</div>
+          </div>
+        </div>
+        <p>Go to <span class="path">DAILY OPS › DELIVERY</span></p>
+        <p>Each morning the app <b>automatically</b> makes up the day's out-bags. A lodge already sorted shows a bright blue <span class="badge b-auto">⚡ AUTO ✓</span>.</p>
+        <div class="note stop"><span class="lbl">Do not tap an ⚡ AUTO ✓ lodge</span>
+          It's already logged. Tapping it again would double the count. If you tap one by accident, the app shows a message and stops you — just close it.</div>
+        <p>Only use Delivery to log a bag the app <em>didn't</em> create (rare). A plain chip with no badge, where a bag really is going out → tap it, adjust the quantities, confirm.</p>
+      </div>
+
+      <div class="step">
+        <div class="hd">
+          <span class="stepno">3</span>
+          <div>
+            <h3>Anything unusual</h3>
+            <div class="where">no-shows, cancellations, bags not needed</div>
+          </div>
+        </div>
+        <p>Go to <span class="path">DAILY OPS › ALERTS</span> — your “needs attention” list.</p>
+        <p><b>A bag isn't needed</b> (guest didn't show, or the booking cancelled)? Find the lodge under <b>“Today's Delivery Bags”</b> and tap <b>↩ Not needed</b>. It then asks: <em>“Is there still dirty linen to collect?”</em></p>
+        <ul>
+          <li><b>Yes</b> — the clean linen goes back on the shelf, but we still expect the dirty bag. The lodge stays on your <span class="badge b-count">⚠ count?</span> list — count the dirty as normal.</li>
+          <li><b>No</b> — nothing more to do for that lodge today.</li>
+        </ul>
+        <p><b>“Uncounted Dirty Linen”</b> lower down = lodges that checked out but you haven't counted yet. Work through them.</p>
+      </div>
+
+      <h2>The golden rules</h2>
+      <div class="note rule"><span class="lbl">Keep these three in mind</span>
+        <ul>
+          <li><b>One tap per bag.</b> Never log the same bag twice — that's what throws the stock off.</li>
+          <li><b>Dirty coming BACK = Bag In. Clean going OUT = Delivery</b> (and Delivery is mostly automatic).</li>
+          <li><b>Not sure? Don't guess — message Lee.</b> A quick question is easier to sort than a wrong number.</li>
+        </ul>
+      </div>
+
+      <h2>What the colours mean</h2>
+      <div class="legend">
+        <div class="row"><span class="badge b-auto">⚡ AUTO ✓</span><span class="txt"><b>Already done for you.</b> The clean out-bag is logged automatically — don't tap it.</span></div>
+        <div class="row"><span class="badge b-bagged">📦 bagged</span><span class="txt"><b>A clean bag was made up recently</b> for this lodge.</span></div>
+        <div class="row"><span class="badge b-count">⚠ count?</span><span class="txt"><b>Still needs a dirty count.</b> This is your to-do list on the Bag In screen.</span></div>
+        <div class="row"><span class="badge b-short">red numbers</span><span class="txt"><b>Below zero / short.</b> The office keeps an eye on these — you don't need to fix them.</span></div>
+      </div>
+    </section>
+
+    <!-- ============ OFFICE ============ -->
+    <section id="office" role="tabpanel" aria-labelledby="tab-office" hidden>
+      <p class="lead">The full picture of the app for office use — every area, how the automatic logging works, and a quick table for the tricky cases that have been tripping people up.</p>
+
+      <h2>The three main areas</h2>
+      <p class="lead" style="margin-bottom:14px">Across the top: <b>DAILY OPS</b>, <b>STOCK</b>, and <b>ADMIN</b>. Staff live in Daily Ops; Stock and Admin are for the office.</p>
+
+      <div class="ref">
+        <h3>📋 DAILY OPS</h3>
+        <div class="tabs">Sub-tabs: Bag In · Delivery · Alerts · Forecast</div>
+        <ul>
+          <li><strong>Bag In</strong> — count dirty linen coming back from a cleaned lodge (Item / Expected / Actual / Status), pick a name, submit. Has a <em>“Phantom checkout? Dismiss”</em> option for a checkout that isn't a real booking.</li>
+          <li><strong>Delivery</strong> — clean linen going out. Now mostly auto-logged (see below). Chips show <span class="badge b-auto">⚡ AUTO ✓</span>, <span class="badge b-bagged">📦 bagged</span>, or plain, plus the lodge's next checkout day.</li>
+          <li><strong>Alerts</strong> — the day's exceptions (detailed below).</li>
+          <li><strong>Forecast</strong> — the GL schedule (High season = Mon · Wed · Fri, Low season = Mon · Thu) and a 7-day checkout forecast.</li>
+        </ul>
+      </div>
+
+      <div class="ref">
+        <h3>⚡ How auto-logging works</h3>
+        <p>The first time anyone opens or refreshes the app each day, it reads that day's checkout list and <strong>automatically creates the clean-linen out-bags</strong> — a full standard set per lodge — deducts them from shelf stock, and flags each one <span class="badge b-auto">⚡ AUTO ✓</span>. There's no button to press.</p>
+        <p>This is what stops the old problem of nobody logging the out-bags. If a staff member taps a chip that's already auto-logged, the app blocks it with a message so the bag can't be counted twice.</p>
+      </div>
+
+      <div class="ref">
+        <h3>🔔 Alerts, in detail</h3>
+        <ul>
+          <li><strong>Unconfirmed Stock Outs</strong> — checked out today but no bag out recorded. Tap a lodge to confirm its delivery went out (logs a full set). <em>A bag marked “Not needed” never appears here.</em></li>
+          <li><strong>Today's Delivery Bags</strong> — every out-bag for today, each with an <span class="badge b-auto">⚡ AUTO</span> badge and a <strong>↩ Not needed</strong> button.</li>
+          <li><strong>↩ Not needed</strong> asks <em>“Is there still dirty linen to collect?”</em> — <strong>Yes</strong> returns the clean to the shelf but keeps the dirty bag-in expected (still shows <span class="badge b-count">⚠ count?</span>); <strong>No</strong> is a full no-show and clears the lodge for the day.</li>
+          <li><strong>Uncounted Dirty Linen</strong> — checked out but no dirty count yet; each has a <em>Defer</em> option to push to tomorrow.</li>
+          <li><strong>Monday reconciliation</strong> — a reminder to do a physical stock count if it's been over a week.</li>
+        </ul>
+      </div>
+
+      <div class="ref">
+        <h3>📦 STOCK</h3>
+        <div class="tabs">Sub-tabs: Warehouse · GL Flow · GL Summary · Daily Report</div>
+        <ul>
+          <li><strong>Warehouse</strong> — current shelf stock per item. <strong>Stock Check</strong> records a physical count; <strong>± Adjust Stock</strong> makes a manual correction. Red negatives mean linen was sent out before the inbound GL delivery was counted in — they correct once that delivery is logged on GL Flow.</li>
+          <li><strong>GL Flow</strong> — the washing pipeline with GL. Log a <strong>New Collection</strong> (dirty we sent to GL) and a <strong>New Delivery</strong> (clean GL sent back), each as Received / Was Sent / Diff.</li>
+          <li><strong>GL Summary</strong> — running totals of what's with GL.</li>
+          <li><strong>Daily Report</strong> — a day's activity summary.</li>
+        </ul>
+      </div>
+
+      <div class="ref">
+        <h3>⚙️ ADMIN</h3>
+        <div class="tabs">Sub-tabs: History · Weekly Summary · Lodge Setup · Pending Returns</div>
+        <ul>
+          <li><strong>History</strong> — every logged entry, filterable by <span class="badge b-bagged">Out</span> <span class="badge b-short">Short</span> Over <span class="badge b-ok">OK</span> and by date. Entries can be edited or marked returned-unused. Includes <strong>Dismissed Checkouts</strong> (phantom bookings) with an <em>Undismiss</em> button.</li>
+          <li><strong>Weekly Summary</strong> — totals for the week.</li>
+          <li><strong>Lodge Setup</strong> — the standard linen set (par) for each lodge.</li>
+          <li><strong>Pending Returns</strong> — bags out that are still awaiting their dirty return.</li>
+        </ul>
+      </div>
+
+      <h2>Common situations — what to do</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Situation</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td>Guest no-show / booking cancelled, bag already made up</td><td>Alerts › <b>Not needed</b> › “still dirty?” <b>No</b></td></tr>
+            <tr><td>No fresh linen needed but dirty still to collect (e.g. owner used their own bedding)</td><td>Alerts › <b>Not needed</b> › “still dirty?” <b>Yes</b> — then count the dirty as normal</td></tr>
+            <tr><td>A clean bag the app didn't auto-create needs to go out</td><td>Delivery › tap the lodge › adjust quantities › confirm</td></tr>
+            <tr><td>Dirty linen came back and the lodge is cleaned</td><td>Bag In › tap the lodge › count › Submit</td></tr>
+            <tr><td>Dirty count is short vs what we sent</td><td>Submit the true count — it flags as <span class="badge b-short">Short</span>; office chases GL</td></tr>
+            <tr><td>Phantom / false checkout (Airbnb “not available”, a Beds24 glitch)</td><td>Bag In › select lodge › <b>Phantom checkout? Dismiss</b> (or dismiss it in Alerts)</td></tr>
+            <tr><td>Something was logged wrong</td><td>Tell the office — Admin › History › find the entry › Edit</td></tr>
+            <tr><td>Shelf stock shows big red negatives</td><td>Usually corrects once the GL delivery is logged on GL Flow; office does a Stock Check to re-base when home</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note rule" style="margin-top:18px"><span class="lbl">Good to know</span>
+        The app syncs live through the cloud, so several people can use it at once and everyone sees the same figures. Precise counting on both sides — dirty out and clean back — is what keeps the stock numbers honest.</div>
+    </section>
+
+    <footer>
+      GL Linen Guide · Cotswold Retreats · kept in step with the live app
+    </footer>
+  </main>
+
+  <script>
+    function showPane(which){
+      var staff = which === 'staff';
+      document.getElementById('staff').hidden = !staff;
+      document.getElementById('office').hidden = staff;
+      document.getElementById('tab-staff').setAttribute('aria-selected', staff);
+      document.getElementById('tab-office').setAttribute('aria-selected', !staff);
+      try{ window.scrollTo({top:0,behavior:'instant'}); }catch(e){ window.scrollTo(0,0); }
+    }
+  </script>
+</body>
+</html>
