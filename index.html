@@ -1143,11 +1143,13 @@ function CountTab({lodges, counts, saveCounts, shelf, saveShelf, todayCheckouts,
           const hasCheckout = todayCheckouts.includes(l);
           const hasCount = counts.some(c => c.lodge===l && c.date===date && c.type!=='stockout');
           const isDeferred = deferred && deferred[l] === date;
-          // If a recent delivery for this lodge was returned unused, no bag-in is expected
+          // If a recent delivery for this lodge was returned unused, no bag-in is expected —
+          // UNLESS it was returned with "dirty still due" (no fresh linen, but dirty to collect),
+          // in which case we still expect and prompt for the bag-in.
           const twoDaysAgo = new Date(); twoDaysAgo.setDate(twoDaysAgo.getDate()-2);
           const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0];
           const returnedUnused = counts.some(c =>
-            c.lodge===l && c.type==='stockout' && c.returnedUnused && c.date>=twoDaysAgoStr);
+            c.lodge===l && c.type==='stockout' && c.returnedUnused && !c.dirtyStillDue && c.date>=twoDaysAgoStr);
           const isDismissed = dismissedCheckouts && dismissedCheckouts[`${l}|${date}`];
           const needsCount = hasCheckout && !hasCount && !isDeferred && !returnedUnused && !isDismissed;
           const chipWarning = needsCount && isPast4pm;
@@ -1306,7 +1308,7 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
   const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0];
   // A returned-unused delivery suppresses alerts for that lodge today.
   const noServiceToday = new Set(
-    counts.filter(c => c.type==='stockout' && c.returnedUnused && c.date>=fiveDaysAgoStr)
+    counts.filter(c => c.type==='stockout' && c.returnedUnused && !c.dirtyStillDue && c.date>=fiveDaysAgoStr)
           .map(c => c.lodge)
   );
   // "Covered" = bagged for this lodge with either:
@@ -1409,7 +1411,11 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
   // Same behaviour as History's "Return Unused" — surfaced here so staff can do
   // it where they work, including cancelling an AUTO-logged bag.
   const returnUnused = (entry) => {
-    if (!window.confirm(`Send ${entry.lodge}'s delivery back to stock as unused?\n\nThe linen goes back on the warehouse shelf and no bag-in will be expected for this lodge today.`)) return;
+    if (!window.confirm(`Send ${entry.lodge}'s delivery back to stock as unused?\n\nThe clean linen goes back on the warehouse shelf.`)) return;
+    // Distinguish a total no-show from "no fresh linen needed, but dirty still to
+    // collect" (e.g. an owner who used their own bedding). If dirty is still coming,
+    // keep expecting the bag-in so it's still prompted; otherwise suppress it.
+    const dirtyStillDue = window.confirm(`Is there still DIRTY linen to collect from ${entry.lodge}?\n\nOK = Yes — keep expecting the dirty bag-in.\nCancel = No — nothing to collect (full no-show).`);
     const newShelf = {...shelf};
     ITEMS.forEach(item => {
       const qty = (entry.actual || entry.qty || {})[item] || 0;
@@ -1418,9 +1424,9 @@ function AlertsTab({counts, saveCounts, shelf, saveShelf, todayCheckouts, deferr
     saveShelf(newShelf, 'delivery_returned_unused', {
       lodge: entry.lodge, date: entry.date,
       qtyReturned: {...(entry.actual || entry.qty || {})},
-      originalStockoutId: entry.id, staffName: ''
+      originalStockoutId: entry.id, dirtyStillDue, staffName: ''
     });
-    saveCounts(counts.map(c => c.id === entry.id ? {...c, returnedUnused: true, returnedAt: new Date().toISOString()} : c));
+    saveCounts(counts.map(c => c.id === entry.id ? {...c, returnedUnused: true, dirtyStillDue, returnedAt: new Date().toISOString()} : c));
   };
 
   return <>
@@ -2396,7 +2402,11 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
             {isStockOut && !entry.returnedUnused && (
               <span className="edit-link" style={{color:'var(--text2)'}}
                 onClick={()=>{
-                  if (!window.confirm(`Mark ${entry.lodge} delivery as returned unused?\n\nThe linen will be added back to the warehouse shelf and no bag-in will be expected for this lodge today.\n\nThis cannot be undone from the app.`)) return;
+                  if (!window.confirm(`Mark ${entry.lodge} delivery as returned unused?\n\nThe clean linen will be added back to the warehouse shelf.\n\nThis cannot be undone from the app.`)) return;
+                  // Distinguish a total no-show from "no fresh linen needed, but dirty
+                  // still to collect". If dirty is still coming, keep expecting the
+                  // bag-in so it's still prompted; otherwise suppress it.
+                  const dirtyStillDue = window.confirm(`Is there still DIRTY linen to collect from ${entry.lodge}?\n\nOK = Yes — keep expecting the dirty bag-in.\nCancel = No — nothing to collect (full no-show).`);
                   // Reverse the shelf delta: add items back
                   const newShelf = {...shelf};
                   ITEMS.forEach(item => {
@@ -2406,10 +2416,10 @@ function HistoryTab({counts, saveCounts, shelf, saveShelf, lodges, dismissedChec
                   saveShelf(newShelf, 'delivery_returned_unused', {
                     lodge: entry.lodge, date: entry.date,
                     qtyReturned: {...(entry.actual || entry.qty || {})},
-                    originalStockoutId: entry.id, staffName: ''
+                    originalStockoutId: entry.id, dirtyStillDue, staffName: ''
                   });
                   // Mark the entry as returned
-                  saveCounts(counts.map(c => c.id === entry.id ? {...c, returnedUnused: true, returnedAt: new Date().toISOString()} : c));
+                  saveCounts(counts.map(c => c.id === entry.id ? {...c, returnedUnused: true, dirtyStillDue, returnedAt: new Date().toISOString()} : c));
                 }}>↩ Return Unused</span>
             )}
             {!entry.returnedUnused && <span className="edit-link" onClick={()=>{setEditEntry(entry);setEditData({...entry.actual});}}>Edit</span>}
