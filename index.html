@@ -1832,6 +1832,12 @@ function GlFlowTab({glFlow, saveGlFlow, counts, watchList, saveWatch, shelf, sav
   const [formNotes, setFormNotes] = useState('');
   const [extras, setExtras] = useState({});
   const [staffName, setStaffName] = useState('');
+  // Safeguard (added Oct 2026): block a delivery that has no GL collection logged
+  // since the last delivery (the common "staff forgot to log the collection" case).
+  // blockInfo holds the dates to show in the escape dialog; pendingDelivery stashes
+  // the in-progress delivery while the user nips off to log the missing collection.
+  const [blockInfo, setBlockInfo] = useState(null);
+  const [pendingDelivery, setPendingDelivery] = useState(null);
 
   const autoFill = () => {
     const lastCol = glFlow.find(g=>g.type==='collection');
@@ -1861,10 +1867,25 @@ function GlFlowTab({glFlow, saveGlFlow, counts, watchList, saveWatch, shelf, sav
     setFormData(totals);
   };
 
-  const saveEntry = () => {
+  const saveEntry = (opts={}) => {
     if (!staffName.trim()) {
       alert('Please enter your name before saving.');
       return;
+    }
+    // ── SAFEGUARD: a GL delivery returns a collection sent to GL a few days
+    // earlier, so there must be a collection logged SINCE the last delivery.
+    // If there isn't, a collection was almost certainly missed — block the save
+    // and offer an escape (log the collection first, or flag it as a part-delivery).
+    if (formType==='delivery' && !opts.skipCollectionGuard) {
+      const prevDel = glFlow.find(g => g.type==='delivery' && (g.date||'') < formDate);
+      const freshCol = glFlow.find(g => g.type==='collection' && (g.date||'') <= formDate
+                         && (!prevDel || (g.date||'') > (prevDel.date||'')));
+      if (!freshCol) {
+        const lastColAny = glFlow.find(g => g.type==='collection');
+        setBlockInfo({ lastColDate: lastColAny ? lastColAny.date : null,
+                       prevDelDate: prevDel ? prevDel.date : null });
+        return;
+      }
     }
     // A GL collection must ALWAYS include the lodge counts (pulled in via the
     // "Auto-fill from lodge counts" button). Guard the common staff error of
@@ -1930,7 +1951,41 @@ function GlFlowTab({glFlow, saveGlFlow, counts, watchList, saveWatch, shelf, sav
       // Collection — doesn't change shelf, so write an audit entry directly
       supaAudit('glflow_collection', {date: formDate, staffName: staffName.trim(), data: finalData, extras: {...extras}, notes: formNotes});
     }
+    // If this collection was logged via the "log the collection first" escape,
+    // drop the user straight back onto the delivery they were mid-way through.
+    if (formType==='collection' && pendingDelivery) {
+      const pd = pendingDelivery;
+      setPendingDelivery(null);
+      setFormType('delivery');
+      setFormData(pd.formData || {});
+      setFormNotes(pd.formNotes || '');
+      setFormDate(pd.formDate || todayStr());
+      setStaffName(pd.staffName || '');
+      setExtras({});
+      setView('form');
+      setTimeout(()=>window.alert('✅ Collection logged. Here’s your delivery again — check it and press “✓ Save Record” to finish.'), 60);
+      return;
+    }
     setView('log'); setFormData({}); setFormNotes(''); setExtras({}); setStaffName('');
+  };
+
+  // Escape 1: stash the in-progress delivery and open a fresh Collection form so
+  // the user can log the missing collection (with the correct date). On save they
+  // resume the delivery automatically (see the pendingDelivery branch above).
+  const escapeLogCollection = () => {
+    setPendingDelivery({ formData: {...formData}, formNotes, formDate, staffName });
+    setBlockInfo(null);
+    setFormType('collection');
+    setFormData({}); setExtras({}); setFormNotes('');
+    // keep staffName; leave formDate for the user to set to the correct collection date
+    setView('form');
+    setTimeout(()=>window.alert('📤 Log the GL collection this delivery is returning.\n\nSet the correct collection date, use “⟳ Auto-fill from lodge counts” if you like, then Save. You’ll be taken back to finish your delivery.'), 60);
+  };
+  // Escape 2: genuine part/follow-on delivery (collection already logged earlier) —
+  // save the delivery, skipping the guard this once.
+  const escapePartDelivery = () => {
+    setBlockInfo(null);
+    saveEntry({ skipCollectionGuard: true });
   };
 
   const unresolved = watchList.filter(w=>!w.resolved);
@@ -1990,10 +2045,27 @@ function GlFlowTab({glFlow, saveGlFlow, counts, watchList, saveWatch, shelf, sav
         <input type="text" placeholder="Any notes..." value={formNotes} onChange={e=>setFormNotes(e.target.value)}/>
       </div>
       <div className="btn-row">
-        <button className="btn btn-ghost" onClick={()=>{setView('log');setStaffName('');}}>Cancel</button>
-        <button className="btn btn-primary" onClick={saveEntry}>✓ Save Record</button>
+        <button className="btn btn-ghost" onClick={()=>{setView('log');setStaffName('');setPendingDelivery(null);}}>Cancel</button>
+        <button className="btn btn-primary" onClick={()=>saveEntry()}>✓ Save Record</button>
       </div>
     </div>
+    {blockInfo && <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:16}}>
+      <div className="card" style={{maxWidth:430,width:'100%',margin:0}}>
+        <div style={{fontSize:16,fontWeight:700,color:'var(--red)',marginBottom:10}}>⚠️ No collection logged for this delivery</div>
+        <div style={{fontSize:13,color:'var(--text2)',lineHeight:1.5,marginBottom:14}}>
+          A GL delivery returns a collection that was sent to GL a few days earlier, so there should be a collection logged since your last delivery.{' '}
+          {blockInfo.lastColDate
+            ? <>The most recent collection is <b>{fmtDate(blockInfo.lastColDate)}</b>{blockInfo.prevDelDate ? <>, which is before your last delivery (<b>{fmtDate(blockInfo.prevDelDate)}</b>).</> : '.'}</>
+            : <>No collection has ever been logged.</>}
+          {' '}It looks like a collection may not have been recorded.
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <button className="btn btn-primary btn-full" onClick={escapeLogCollection}>📤 Log the collection first</button>
+          <button className="btn btn-ghost btn-full" onClick={escapePartDelivery}>This is a part / follow-on delivery — save anyway</button>
+          <button className="btn btn-ghost btn-full" style={{color:'var(--text3)'}} onClick={()=>setBlockInfo(null)}>Cancel</button>
+        </div>
+      </div>
+    </div>}
   </>;
 
   return <>
